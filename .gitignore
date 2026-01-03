@@ -1,0 +1,30 @@
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build
+bin/
+obj/
+
+## Logs
+*.log
+
+## Rider / VSCode
+.idea/
+.vscode/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Docker
+**/docker-compose.override.yml
+
+## Test results
+TestResults/
+
+## Coverage
+coverage/

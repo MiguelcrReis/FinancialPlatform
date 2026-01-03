@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/AccountService/AccountService.csproj" Id="9ddb4845-d284-4d74-a623-7f7ee8bec8e8" />
+  <Project Path="src/ApiGateway/ApiGateway.csproj" />
+  <Project Path="src/FraudService/FraudService.csproj" Id="ff231aac-2c58-428b-b659-7fb8a1fc03b2" />
+  <Project Path="src/TransactionService/TransactionService.csproj" Id="9ee05651-6d96-46fe-bd16-9204d59274f0" />
+</Solution>
