@@ -2,6 +2,7 @@ using ApiGateway.Services;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Polly;
 using Prometheus;
 using Serilog;
 
@@ -51,11 +52,24 @@ builder.Services.AddHttpClient("TransactionService", client =>
     client.BaseAddress = new Uri("https://localhost:7057");
 });
 
+
 builder.Services.AddHttpClient("AccountService", client =>
 {
     client.BaseAddress = new Uri("https://localhost:7033");
-});
-
+})
+.AddTransientHttpErrorPolicy(policy => policy
+    .WaitAndRetryAsync(
+        retryCount: 3,
+        sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(200 * attempt)
+    )
+)
+.AddTransientHttpErrorPolicy(policy => policy
+    .CircuitBreakerAsync(
+        handledEventsAllowedBeforeBreaking: 2,
+        durationOfBreak: TimeSpan.FromSeconds(10)
+    )
+)
+.AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(3)));
 
 builder.Services.AddScoped<TransactionServiceClient>();
 builder.Services.AddScoped<AccountServiceClient>();
