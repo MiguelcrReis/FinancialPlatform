@@ -1,4 +1,5 @@
 ﻿using ApiGateway.DTOs;
+using ApiGateway.Services;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
@@ -6,23 +7,18 @@ namespace ApiGateway.Controllers
 {
     [ApiController]
     [Route("api/transactions")]
-    public class TransactionsController : Controller
+    public class TransactionsController : ControllerBase
     {
         [HttpPost]
-        public IActionResult Create([FromBody] CreateTransactionRequest request)
+        public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request, [FromServices] TransactionServiceClient client)
         {
-            Log.Information(
-                "Received transaction request | AccountId={AccountId} Amount={Amount} Currency={Currency}",
-                request.AccountId,
-                request.Amount,
-                request.Currency
-            );
+            var response = await client.CreateAsync(request);
 
-            return Accepted(new
-            {
-                Message = "Transaction accepted for processing",
-                CorrelationId = HttpContext.TraceIdentifier
-            });
+            if (!response.IsSuccessStatusCode)
+                return StatusCode((int)response.StatusCode);
+
+            var result = await response.Content.ReadAsStringAsync();
+            return Ok(result);
         }
     }
 }

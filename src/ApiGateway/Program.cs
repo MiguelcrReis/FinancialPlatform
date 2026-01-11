@@ -1,3 +1,4 @@
+using ApiGateway.Services;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -44,6 +45,13 @@ builder.Services.AddOpenTelemetry()
             .AddAspNetCoreInstrumentation()
             .AddRuntimeInstrumentation();
     });
+
+builder.Services.AddHttpClient("TransactionService", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7057");
+});
+
+builder.Services.AddScoped<TransactionServiceClient>();
 
 var app = builder.Build();
 
