@@ -10,15 +10,19 @@ namespace ApiGateway.Controllers
     public class TransactionsController : ControllerBase
     {
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request, [FromServices] TransactionServiceClient client)
+        public async Task<IActionResult> Create(
+            CreateTransactionRequest request,
+            AccountServiceClient accountClient,
+            TransactionServiceClient transactionClient)
         {
-            var response = await client.CreateAsync(request);
+            var isValid = await accountClient.ValidateAsync(request);
 
-            if (!response.IsSuccessStatusCode)
-                return StatusCode((int)response.StatusCode);
+            if (!isValid)
+                return BadRequest("Account validation failed");
 
-            var result = await response.Content.ReadAsStringAsync();
-            return Ok(result);
+            var response = await transactionClient.CreateAsync(request);
+
+            return StatusCode((int)response.StatusCode);
         }
     }
 }

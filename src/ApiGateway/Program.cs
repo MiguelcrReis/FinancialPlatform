@@ -51,7 +51,14 @@ builder.Services.AddHttpClient("TransactionService", client =>
     client.BaseAddress = new Uri("https://localhost:7057");
 });
 
+builder.Services.AddHttpClient("AccountService", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7033");
+});
+
+
 builder.Services.AddScoped<TransactionServiceClient>();
+builder.Services.AddScoped<AccountServiceClient>();
 
 var app = builder.Build();
 
