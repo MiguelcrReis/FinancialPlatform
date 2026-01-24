@@ -1,30 +1,44 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using TransactionService.DTOs;
+using TransactionService.Services;
 
 namespace TransactionService.Controllers
 {
     [ApiController]
-    [Route("api/transactions")]
+    [Route("api/[controller]")]
     public class TransactionsController : ControllerBase
     {
-        [HttpPost("process")]
-        public IActionResult Process([FromBody] ProcessTransactionRequest request)
-        {
-            Log.Information(
-                "Transaction received | AccountId={AccountId} Amount={Amount}",
-                request.AccountId,
-                request.Amount
-            );
+        private readonly ITransactionProcessorService _service;
 
+        public TransactionsController(ITransactionProcessorService service)
+        {
+            _service = service;
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateTransactionRequest request)
+        {
             if (request.Amount <= 0)
-                return BadRequest("Invalid amount");
+                return BadRequest("Amount must be greater than zero.");
+
+            if (request.AccountFrom == request.AccountTo)
+                return BadRequest("Origin and destination accounts cannot be the same.");
+
+            var trx = await _service.CreateAsync(request);
 
             return Ok(new
             {
-                Status = "Processed",
-                TransactionId = Guid.NewGuid()
+                trx.Id,
+                trx.Status,
+                trx.CreatedAt
             });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            return Ok(await _service.GetAllAsync());
         }
     }
 }
