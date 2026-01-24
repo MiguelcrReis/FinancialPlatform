@@ -15,7 +15,7 @@ namespace ApiGateway.Controllers
             AccountServiceClient accountClient,
             TransactionServiceClient transactionClient)
         {
-            var isValid = await accountClient.ValidateAsync(request);
+            var isValid = await accountClient.ValidateAsync(request, HttpContext.RequestAborted);
 
             if (!isValid)
                 return BadRequest("Account validation failed");

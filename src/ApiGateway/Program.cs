@@ -69,7 +69,9 @@ builder.Services.AddHttpClient("AccountService", client =>
         durationOfBreak: TimeSpan.FromSeconds(10)
     )
 )
-.AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(3)));
+.AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(
+    TimeSpan.FromSeconds(10),
+    Polly.Timeout.TimeoutStrategy.Pessimistic));
 
 builder.Services.AddScoped<TransactionServiceClient>();
 builder.Services.AddScoped<AccountServiceClient>();

@@ -2,6 +2,6 @@
 
 public class ValidateAccountRequest
 {
-    public string AccountId { get; set; } = null!;
+    public Guid AccountId { get; set; }
     public decimal Amount { get; set; }
-}   
+}

@@ -1,3 +1,4 @@
+using AccountService.Services;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -44,6 +45,8 @@ builder.Services.AddOpenTelemetry()
             .AddAspNetCoreInstrumentation()
             .AddRuntimeInstrumentation();
     });
+
+builder.Services.AddScoped<IAccountService, AccountService.Services.AccountService>();
 
 var app = builder.Build();
 

@@ -1,29 +1,32 @@
 ﻿using AccountService.DTOs;
+using AccountService.Services;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
 namespace AccountService.Controllers;
 
 [ApiController]
-[Route("api/accounts")]
+[Route("api/[controller]")]
 public class AccountsController : ControllerBase
 {
+    private readonly IAccountService _accountService;
+
+    public AccountsController(IAccountService accountService)
+    {
+        _accountService = accountService;
+    }
+
+    /// <summary>
+    /// Validates if an account exists, is active, and has enough balance.
+    /// </summary>
     [HttpPost("validate")]
     public IActionResult Validate([FromBody] ValidateAccountRequest request)
     {
-        Log.Information(
-            "Validating account {AccountId} for amount {Amount}",
-            request.AccountId,
-            request.Amount
-        );
+        var response = _accountService.Validate(request);
 
-        // Simulação
-        if (request.Amount > 1000)
-        {
-            Log.Warning("Insufficient funds");
-            return BadRequest("Insufficient funds");
-        }
+        if (!response.IsValid)
+            return BadRequest(response);
 
-        return Ok(new { Status = "Valid" });
+        return Ok(response);
     }
 }
