@@ -1,4 +1,6 @@
+using ApiGateway.Messaging.Publishers;
 using ApiGateway.Services;
+using BuildingBlocks.Messaging.Interfaces;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -55,7 +57,7 @@ builder.Services.AddHttpClient("TransactionService", client =>
 
 builder.Services.AddHttpClient("AccountService", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7033");
+    client.BaseAddress = new Uri("http://localhost:5092");
 })
 .AddTransientHttpErrorPolicy(policy => policy
     .WaitAndRetryAsync(
@@ -75,6 +77,8 @@ builder.Services.AddHttpClient("AccountService", client =>
 
 builder.Services.AddScoped<TransactionServiceClient>();
 builder.Services.AddScoped<AccountServiceClient>();
+
+builder.Services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
 
 var app = builder.Build();
 

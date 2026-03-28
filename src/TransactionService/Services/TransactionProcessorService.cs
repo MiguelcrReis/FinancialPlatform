@@ -1,33 +1,24 @@
-﻿using TransactionService.DTOs;
+﻿using BuildingBlocks.Messaging.Contracts;
+using TransactionService.DTOs;
 using TransactionService.Models;
 
 namespace TransactionService.Services
 {
     public class TransactionProcessorService : ITransactionProcessorService
     {
-        private static readonly List<Transaction> _transactions = new();
-
-        public Task<Transaction> CreateAsync(CreateTransactionRequest request)
+        public Task ProcessAsync(TransactionCreatedEvent message)
         {
-            var transaction = new Transaction
-            {
-                Id = Guid.NewGuid().ToString(),
-                AccountFrom = request.AccountFrom,
-                AccountTo = request.AccountTo,
-                Amount = request.Amount,
-                Type = request.Type,
-                CreatedAt = DateTime.UtcNow,
-                Status = "APPROVED"
-            };
+            Console.WriteLine("=== PROCESSANDO TRANSAÇÃO ===");
 
-            _transactions.Add(transaction);
+            Console.WriteLine($"Id: {message.TransactionId}");
+            Console.WriteLine($"From: {message.FromAccount}");
+            Console.WriteLine($"To: {message.ToAccount}");
+            Console.WriteLine($"Amount: {message.Amount}");
+            Console.WriteLine($"Currency: {message.Currency}");
 
-            return Task.FromResult(transaction);
-        }
+            // ToDo: salvar no banco
 
-        public Task<IEnumerable<Transaction>> GetAllAsync()
-        {
-            return Task.FromResult(_transactions.AsEnumerable());
+            return Task.CompletedTask;
         }
     }
 }

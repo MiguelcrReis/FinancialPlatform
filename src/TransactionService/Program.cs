@@ -3,6 +3,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Prometheus;
 using Serilog;
+using TransactionService.Consumers;
 using TransactionService.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,9 +47,10 @@ builder.Services.AddOpenTelemetry()
             .AddRuntimeInstrumentation();
     });
 
-var app = builder.Build();
-
 builder.Services.AddSingleton<ITransactionProcessorService, TransactionProcessorService>();
+builder.Services.AddHostedService<TransactionConsumer>();
+
+var app = builder.Build();
 
 // --------------------
 // Middleware

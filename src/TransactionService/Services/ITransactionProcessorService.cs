@@ -1,11 +1,9 @@
-﻿using TransactionService.DTOs;
-using TransactionService.Models;
+﻿using BuildingBlocks.Messaging.Contracts;
 
 namespace TransactionService.Services
 {
     public interface ITransactionProcessorService
     {
-        Task<Transaction> CreateAsync(CreateTransactionRequest request);
-        Task<IEnumerable<Transaction>> GetAllAsync();
+        Task ProcessAsync(TransactionCreatedEvent message);
     }
 }

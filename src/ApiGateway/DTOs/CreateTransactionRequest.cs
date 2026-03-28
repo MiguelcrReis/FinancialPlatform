@@ -6,5 +6,7 @@
         public decimal Amount { get; set; }
         public string Currency { get; set; } = "BRL";
         public string Description { get; set; } = string.Empty;
+        public string FromAccount { get; set; } = null!;
+        public string ToAccount { get; set; } = null!;
     }
 }
