@@ -1,6 +1,5 @@
 using BuildingBlocks.Messaging.Contracts;
 using TransactionService.Application.Interfaces;
-using TransactionService.Application.Models;
 using TransactionService.Infrastructure.Persistence;
 using TransactionService.Domain;
 
@@ -15,9 +14,9 @@ namespace TransactionService.Application.Services
             _repository = repository;
         }
 
-        public async Task ProcessAsync(TransactionCreated message, CancellationToken ct = default)
+        public async Task ProcessAsync(TransactionCreatedEvent message, CancellationToken ct = default)
         {
-            // map application model to domain
+            // map integration event to domain
             var tx = new Transaction
             {
                 Id = message.TransactionId,

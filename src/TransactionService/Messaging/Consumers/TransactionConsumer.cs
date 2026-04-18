@@ -5,8 +5,6 @@ using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 using TransactionService.Application.Interfaces;
-using TransactionService.Application.Models;
-using TransactionService.Messaging.Events;
 
 namespace TransactionService.Messaging.Consumers
 {
@@ -33,10 +31,10 @@ namespace TransactionService.Messaging.Consumers
             consumer.Received += async (_, ea) =>
             {
                 var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-                TransactionCreatedIntegrationEvent? message = null;
+                TransactionCreatedEvent? message = null;
                 try
                 {
-                    message = JsonSerializer.Deserialize<TransactionCreatedIntegrationEvent>(json);
+                    message = JsonSerializer.Deserialize<TransactionCreatedEvent>(json);
                 }
                 catch (Exception ex)
                 {
@@ -50,9 +48,7 @@ namespace TransactionService.Messaging.Consumers
                         using var scope = _services.CreateScope();
                         var processor = scope.ServiceProvider.GetRequiredService<ITransactionProcessorService>();
 
-                        var appModel = new TransactionCreated(message.TransactionId, message.FromAccount, message.ToAccount, message.Amount, message.Currency, message.Description, message.CreatedAt);
-
-                        await processor.ProcessAsync(appModel, stoppingToken);
+                        await processor.ProcessAsync(message, stoppingToken);
 
                         _channel.BasicAck(ea.DeliveryTag, false);
                     }

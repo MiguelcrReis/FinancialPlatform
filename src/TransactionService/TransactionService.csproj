@@ -29,4 +29,9 @@
     <ProjectReference Include="..\BuildingBlocks\BuildingBlocks.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Application\Models\" />
+    <Folder Include="Messaging\Events\" />
+  </ItemGroup>
+
 </Project>
