@@ -3,8 +3,11 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Prometheus;
 using Serilog;
-using TransactionService.Consumers;
-using TransactionService.Services;
+using RabbitMQ.Client;
+using TransactionService.Infrastructure.Persistence;
+using TransactionService.Application.Interfaces;
+using TransactionService.Application.Services;
+using TransactionService.Messaging.Consumers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,7 +50,39 @@ builder.Services.AddOpenTelemetry()
             .AddRuntimeInstrumentation();
     });
 
-builder.Services.AddSingleton<ITransactionProcessorService, TransactionProcessorService>();
+// --------------------
+// Application DI
+// --------------------
+// Repository should be a singleton for in-memory store and thread-safety
+builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
+
+// Query service used by Controllers
+builder.Services.AddScoped<ITransactionQueryService, TransactionQueryService>();
+
+// Processor service is scoped (created per message handling scope)
+builder.Services.AddScoped<ITransactionProcessorService, TransactionProcessorService>();
+
+// RabbitMQ connection
+builder.Services.AddSingleton(sp =>
+{
+    var cfg = builder.Configuration.GetSection("RabbitMq");
+    var host = cfg.GetValue<string>("HostName") ?? "localhost";
+    var user = cfg.GetValue<string>("UserName");
+    var pass = cfg.GetValue<string>("Password");
+
+    var factory = new ConnectionFactory
+    {
+        HostName = host,
+        DispatchConsumersAsync = true
+    };
+
+    if (!string.IsNullOrEmpty(user)) factory.UserName = user;
+    if (!string.IsNullOrEmpty(pass)) factory.Password = pass;
+
+    return factory.CreateConnection();
+});
+
+// Background consumer (hosted service) - it will create scopes per message
 builder.Services.AddHostedService<TransactionConsumer>();
 
 var app = builder.Build();
