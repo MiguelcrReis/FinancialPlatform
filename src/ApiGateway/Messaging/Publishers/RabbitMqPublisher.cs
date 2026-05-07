@@ -11,18 +11,25 @@ namespace ApiGateway.Messaging.Publishers
         private readonly IModel _channel;
         private const string ExchangeName = "transactions-exchange";
 
-        public RabbitMqPublisher()
+        public RabbitMqPublisher(IConfiguration configuration)
         {
+            var cfg = configuration.GetSection("RabbitMq");
+            var host = cfg.GetValue<string>("HostName") ?? "localhost";
+            var user = cfg.GetValue<string>("UserName");
+            var pass = cfg.GetValue<string>("Password");
+
             var factory = new ConnectionFactory()
             {
-                HostName = "localhost",
+                HostName = host,
                 DispatchConsumersAsync = true
             };
+
+            if (!string.IsNullOrEmpty(user)) factory.UserName = user;
+            if (!string.IsNullOrEmpty(pass)) factory.Password = pass;
 
             _connection = factory.CreateConnection();
             _channel = _connection.CreateModel();
 
-            // 🔥 Garante que a exchange existe
             _channel.ExchangeDeclare(
                 exchange: ExchangeName,
                 type: ExchangeType.Direct,
@@ -36,7 +43,7 @@ namespace ApiGateway.Messaging.Publishers
             var body = Encoding.UTF8.GetBytes(json);
 
             var properties = _channel.CreateBasicProperties();
-            properties.Persistent = true; // 🔥 mensagem não se perde
+            properties.Persistent = true;
 
             _channel.BasicPublish(
                 exchange: ExchangeName,

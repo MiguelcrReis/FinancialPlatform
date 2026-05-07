@@ -4,7 +4,9 @@ using OpenTelemetry.Trace;
 using Prometheus;
 using Serilog;
 using RabbitMQ.Client;
+using MongoDB.Driver;
 using TransactionService.Infrastructure.Persistence;
+using TransactionService.Infrastructure.Settings;
 using TransactionService.Application.Interfaces;
 using TransactionService.Application.Services;
 using TransactionService.Messaging.Consumers;
@@ -53,8 +55,19 @@ builder.Services.AddOpenTelemetry()
 // --------------------
 // Application DI
 // --------------------
-// Repository should be a singleton for in-memory store and thread-safety
-builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
+builder.Services.Configure<MongoDbSettings>(
+    builder.Configuration.GetSection(MongoDbSettings.SectionName));
+
+builder.Services.AddSingleton<IMongoClient>(_ =>
+{
+    var settings = builder.Configuration
+        .GetSection(MongoDbSettings.SectionName)
+        .Get<MongoDbSettings>() ?? new MongoDbSettings();
+
+    return new MongoClient(settings.ConnectionString);
+});
+
+builder.Services.AddSingleton<ITransactionRepository, MongoTransactionRepository>();
 
 // Query service used by Controllers
 builder.Services.AddScoped<ITransactionQueryService, TransactionQueryService>();

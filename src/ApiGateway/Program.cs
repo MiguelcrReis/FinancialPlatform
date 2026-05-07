@@ -51,13 +51,19 @@ builder.Services.AddOpenTelemetry()
 
 builder.Services.AddHttpClient("TransactionService", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7057");
+    var baseUrl = builder.Configuration["Services:TransactionService:BaseUrl"]
+        ?? "https://localhost:7057";
+
+    client.BaseAddress = new Uri(baseUrl);
 });
 
 
 builder.Services.AddHttpClient("AccountService", client =>
 {
-    client.BaseAddress = new Uri("http://localhost:5092");
+    var baseUrl = builder.Configuration["Services:AccountService:BaseUrl"]
+        ?? "http://localhost:5092";
+
+    client.BaseAddress = new Uri(baseUrl);
 })
 .AddTransientHttpErrorPolicy(policy => policy
     .WaitAndRetryAsync(
