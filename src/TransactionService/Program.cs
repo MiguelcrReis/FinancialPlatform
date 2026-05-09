@@ -58,6 +58,9 @@ builder.Services.AddOpenTelemetry()
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection(MongoDbSettings.SectionName));
 
+builder.Services.Configure<RabbitMqSettings>(
+    builder.Configuration.GetSection(RabbitMqSettings.SectionName));
+
 builder.Services.AddSingleton<IMongoClient>(_ =>
 {
     var settings = builder.Configuration
@@ -78,19 +81,18 @@ builder.Services.AddScoped<ITransactionProcessorService, TransactionProcessorSer
 // RabbitMQ connection
 builder.Services.AddSingleton(sp =>
 {
-    var cfg = builder.Configuration.GetSection("RabbitMq");
-    var host = cfg.GetValue<string>("HostName") ?? "localhost";
-    var user = cfg.GetValue<string>("UserName");
-    var pass = cfg.GetValue<string>("Password");
+    var settings = builder.Configuration
+        .GetSection(RabbitMqSettings.SectionName)
+        .Get<RabbitMqSettings>() ?? new RabbitMqSettings();
 
     var factory = new ConnectionFactory
     {
-        HostName = host,
+        HostName = settings.HostName,
         DispatchConsumersAsync = true
     };
 
-    if (!string.IsNullOrEmpty(user)) factory.UserName = user;
-    if (!string.IsNullOrEmpty(pass)) factory.Password = pass;
+    if (!string.IsNullOrEmpty(settings.UserName)) factory.UserName = settings.UserName;
+    if (!string.IsNullOrEmpty(settings.Password)) factory.Password = settings.Password;
 
     return factory.CreateConnection();
 });

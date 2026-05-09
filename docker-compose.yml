@@ -56,6 +56,13 @@ services:
       RabbitMq__HostName: rabbitmq
       RabbitMq__UserName: guest
       RabbitMq__Password: guest
+      RabbitMq__ExchangeName: transactions-exchange
+      RabbitMq__QueueName: transactions
+      RabbitMq__RoutingKey: transaction.created
+      RabbitMq__DeadLetterExchangeName: transactions-dlx
+      RabbitMq__DeadLetterQueueName: transactions-dead-letter
+      RabbitMq__DeadLetterRoutingKey: transaction.failed
+      RabbitMq__MaxRetryCount: 3
     depends_on:
       rabbitmq:
         condition: service_healthy

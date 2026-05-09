@@ -28,3 +28,6 @@ TestResults/
 
 ## Coverage
 coverage/
+
+## Local AI/chat context
+PROJECT_CONTEXT.local.md
