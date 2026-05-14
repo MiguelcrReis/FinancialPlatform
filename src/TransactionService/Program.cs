@@ -94,7 +94,13 @@ builder.Services.AddSingleton(sp =>
     if (!string.IsNullOrEmpty(settings.UserName)) factory.UserName = settings.UserName;
     if (!string.IsNullOrEmpty(settings.Password)) factory.Password = settings.Password;
 
-    return factory.CreateConnection();
+    var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Program>>();
+
+    return CreateRabbitMqConnectionWithRetry(
+        factory,
+        logger,
+        settings.ConnectionRetryCount,
+        TimeSpan.FromSeconds(settings.ConnectionRetryDelaySeconds));
 });
 
 // Background consumer (hosted service) - it will create scopes per message
@@ -125,3 +131,31 @@ app.MapControllers();
 app.MapMetrics();
 
 app.Run();
+
+static IConnection CreateRabbitMqConnectionWithRetry(
+    ConnectionFactory factory,
+    Microsoft.Extensions.Logging.ILogger logger,
+    int maxAttempts,
+    TimeSpan retryDelay)
+{
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        try
+        {
+            return factory.CreateConnection();
+        }
+        catch (Exception ex) when (attempt < maxAttempts)
+        {
+            logger.LogWarning(
+                ex,
+                "RabbitMQ connection failed. Attempt {Attempt}/{MaxAttempts}. Retrying in {DelaySeconds} seconds.",
+                attempt,
+                maxAttempts,
+                retryDelay.TotalSeconds);
+
+            Thread.Sleep(retryDelay);
+        }
+    }
+
+    return factory.CreateConnection();
+}

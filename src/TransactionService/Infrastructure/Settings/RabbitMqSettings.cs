@@ -14,5 +14,7 @@ namespace TransactionService.Infrastructure.Settings
         public string DeadLetterQueueName { get; set; } = "transactions-dead-letter";
         public string DeadLetterRoutingKey { get; set; } = "transaction.failed";
         public int MaxRetryCount { get; set; } = 3;
+        public int ConnectionRetryCount { get; set; } = 10;
+        public int ConnectionRetryDelaySeconds { get; set; } = 2;
     }
 }

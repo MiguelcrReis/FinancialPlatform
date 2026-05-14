@@ -10,13 +10,20 @@ namespace ApiGateway.Messaging.Publishers
         private readonly IConnection _connection;
         private readonly IModel _channel;
         private const string ExchangeName = "transactions-exchange";
+        private const int DefaultConnectionRetryCount = 10;
+        private static readonly TimeSpan DefaultConnectionRetryDelay = TimeSpan.FromSeconds(2);
 
-        public RabbitMqPublisher(IConfiguration configuration)
+        public RabbitMqPublisher(
+            IConfiguration configuration,
+            ILogger<RabbitMqPublisher> logger)
         {
             var cfg = configuration.GetSection("RabbitMq");
             var host = cfg.GetValue<string>("HostName") ?? "localhost";
             var user = cfg.GetValue<string>("UserName");
             var pass = cfg.GetValue<string>("Password");
+            var retryCount = cfg.GetValue<int?>("ConnectionRetryCount") ?? DefaultConnectionRetryCount;
+            var retryDelaySeconds = cfg.GetValue<int?>("ConnectionRetryDelaySeconds")
+                ?? (int)DefaultConnectionRetryDelay.TotalSeconds;
 
             var factory = new ConnectionFactory()
             {
@@ -27,7 +34,11 @@ namespace ApiGateway.Messaging.Publishers
             if (!string.IsNullOrEmpty(user)) factory.UserName = user;
             if (!string.IsNullOrEmpty(pass)) factory.Password = pass;
 
-            _connection = factory.CreateConnection();
+            _connection = CreateConnectionWithRetry(
+                factory,
+                logger,
+                retryCount,
+                TimeSpan.FromSeconds(retryDelaySeconds));
             _channel = _connection.CreateModel();
 
             _channel.ExchangeDeclare(
@@ -59,6 +70,34 @@ namespace ApiGateway.Messaging.Publishers
         {
             _channel?.Close();
             _connection?.Close();
+        }
+
+        private static IConnection CreateConnectionWithRetry(
+            ConnectionFactory factory,
+            ILogger logger,
+            int maxAttempts,
+            TimeSpan retryDelay)
+        {
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    return factory.CreateConnection();
+                }
+                catch (Exception ex) when (attempt < maxAttempts)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "RabbitMQ connection failed. Attempt {Attempt}/{MaxAttempts}. Retrying in {DelaySeconds} seconds.",
+                        attempt,
+                        maxAttempts,
+                        retryDelay.TotalSeconds);
+
+                    Thread.Sleep(retryDelay);
+                }
+            }
+
+            return factory.CreateConnection();
         }
     }
 }

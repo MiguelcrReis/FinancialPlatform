@@ -71,8 +71,7 @@ namespace TransactionService.Infrastructure.Persistence
                 new CreateIndexOptions<Transaction>
                 {
                     Name = "ux_transactions_external_id",
-                    Unique = true,
-                    PartialFilterExpression = Builders<Transaction>.Filter.Ne(t => t.ExternalId, string.Empty)
+                    Unique = true
                 });
 
             var accountIndex = new CreateIndexModel<Transaction>(

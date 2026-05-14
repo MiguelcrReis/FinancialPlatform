@@ -1,8 +1,14 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
 namespace TransactionService.Domain
 {
     public class Transaction
     {
+        [BsonId]
+        [BsonGuidRepresentation(GuidRepresentation.Standard)]
         public Guid Id { get; set; } = Guid.NewGuid();
+
         // ExternalId is used to ensure idempotency when processing integration events
         public string ExternalId { get; set; } = string.Empty;
         public string FromAccount { get; set; } = null!;

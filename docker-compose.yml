@@ -63,6 +63,8 @@ services:
       RabbitMq__DeadLetterQueueName: transactions-dead-letter
       RabbitMq__DeadLetterRoutingKey: transaction.failed
       RabbitMq__MaxRetryCount: 3
+      RabbitMq__ConnectionRetryCount: 10
+      RabbitMq__ConnectionRetryDelaySeconds: 2
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -84,6 +86,8 @@ services:
       RabbitMq__HostName: rabbitmq
       RabbitMq__UserName: guest
       RabbitMq__Password: guest
+      RabbitMq__ConnectionRetryCount: 10
+      RabbitMq__ConnectionRetryDelaySeconds: 2
     depends_on:
       rabbitmq:
         condition: service_healthy
