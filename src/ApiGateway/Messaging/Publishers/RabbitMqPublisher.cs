@@ -1,7 +1,8 @@
-﻿using BuildingBlocks.Messaging.Interfaces;
-using RabbitMQ.Client;
 using System.Text;
 using System.Text.Json;
+using BuildingBlocks.Correlation;
+using BuildingBlocks.Messaging.Interfaces;
+using RabbitMQ.Client;
 
 namespace ApiGateway.Messaging.Publishers
 {
@@ -9,6 +10,7 @@ namespace ApiGateway.Messaging.Publishers
     {
         private readonly IConnection _connection;
         private readonly IModel _channel;
+        private readonly ILogger<RabbitMqPublisher> _logger;
         private const string ExchangeName = "transactions-exchange";
         private const int DefaultConnectionRetryCount = 10;
         private static readonly TimeSpan DefaultConnectionRetryDelay = TimeSpan.FromSeconds(2);
@@ -17,6 +19,7 @@ namespace ApiGateway.Messaging.Publishers
             IConfiguration configuration,
             ILogger<RabbitMqPublisher> logger)
         {
+            _logger = logger;
             var cfg = configuration.GetSection("RabbitMq");
             var host = cfg.GetValue<string>("HostName") ?? "localhost";
             var user = cfg.GetValue<string>("UserName");
@@ -48,13 +51,32 @@ namespace ApiGateway.Messaging.Publishers
             );
         }
 
-        public Task PublishAsync<T>(string routingKey, T message)
+        public Task PublishAsync<T>(
+            string routingKey,
+            T message,
+            IReadOnlyDictionary<string, object>? headers = null)
         {
             var json = JsonSerializer.Serialize(message);
             var body = Encoding.UTF8.GetBytes(json);
 
             var properties = _channel.CreateBasicProperties();
             properties.Persistent = true;
+            properties.ContentType = "application/json";
+            properties.MessageId = Guid.NewGuid().ToString("D");
+
+            if (headers is not null)
+            {
+                properties.Headers = new Dictionary<string, object>(headers);
+
+                var correlationId = CorrelationIdHeaders.ReadRabbitMqCorrelationId(properties.Headers);
+                if (correlationId is not null)
+                {
+                    properties.Headers[CorrelationIdConstants.RabbitMqHeaderName] = correlationId;
+                    properties.CorrelationId = correlationId;
+                }
+            }
+
+            var publishedCorrelationId = CorrelationIdHeaders.ReadRabbitMqCorrelationId(properties.Headers);
 
             _channel.BasicPublish(
                 exchange: ExchangeName,
@@ -62,6 +84,11 @@ namespace ApiGateway.Messaging.Publishers
                 basicProperties: properties,
                 body: body
             );
+
+            _logger.LogInformation(
+                "Published RabbitMQ message with routing key {RoutingKey} and correlation id {CorrelationId}",
+                routingKey,
+                publishedCorrelationId);
 
             return Task.CompletedTask;
         }

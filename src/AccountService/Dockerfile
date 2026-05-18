@@ -13,6 +13,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["src/AccountService/AccountService.csproj", "src/AccountService/"]
+COPY ["src/BuildingBlocks/BuildingBlocks.csproj", "src/BuildingBlocks/"]
 RUN dotnet restore "./src/AccountService/AccountService.csproj"
 COPY . .
 WORKDIR "/src/src/AccountService"

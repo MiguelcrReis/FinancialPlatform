@@ -8,10 +8,14 @@ namespace TransactionService.Application.Services
     public class TransactionProcessorService : ITransactionProcessorService
     {
         private readonly ITransactionRepository _repository;
+        private readonly ILogger<TransactionProcessorService> _logger;
 
-        public TransactionProcessorService(ITransactionRepository repository)
+        public TransactionProcessorService(
+            ITransactionRepository repository,
+            ILogger<TransactionProcessorService> logger)
         {
             _repository = repository;
+            _logger = logger;
         }
 
         public async Task ProcessAsync(TransactionCreatedEvent message, CancellationToken ct = default)
@@ -31,8 +35,7 @@ namespace TransactionService.Application.Services
 
             await _repository.AddAsync(tx, ct);
 
-            // TODO: publish further events / side-effects
-            Console.WriteLine($"Processed transaction {tx.Id}");
+            _logger.LogInformation("Processed transaction {TransactionId}", tx.Id);
         }
     }
 }

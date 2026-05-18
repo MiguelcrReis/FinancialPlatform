@@ -1,5 +1,6 @@
 using ApiGateway.Messaging.Publishers;
 using ApiGateway.Services;
+using BuildingBlocks.Correlation;
 using BuildingBlocks.Messaging.Interfaces;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -7,17 +8,33 @@ using OpenTelemetry.Trace;
 using Polly;
 using Prometheus;
 using Serilog;
+using Serilog.Sinks.OpenTelemetry;
 
 var builder = WebApplication.CreateBuilder(args);
+var serviceName = builder.Environment.ApplicationName;
+var environmentName = builder.Environment.EnvironmentName;
+var otlpEndpoint = builder.Configuration["Observability:OtlpEndpoint"] ?? "http://localhost:4317";
 
 // --------------------
 // Logging (Serilog)
 // --------------------
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .Enrich.WithProperty("ServiceName", builder.Environment.ApplicationName)
+    .Enrich.WithProperty("ServiceName", serviceName)
+    .Enrich.WithProperty("Environment", environmentName)
     .WriteTo.Console(outputTemplate:
         "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.OpenTelemetry(options =>
+    {
+        options.Endpoint = otlpEndpoint;
+        options.Protocol = OtlpProtocol.Grpc;
+        options.ResourceAttributes = new Dictionary<string, object>
+        {
+            ["service.name"] = serviceName,
+            ["deployment.environment"] = environmentName,
+            ["service.namespace"] = "FinancialPlatform"
+        };
+    })
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -28,6 +45,8 @@ builder.Host.UseSerilog();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<ICorrelationContext, CorrelationContext>();
+builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
 
 // --------------------
 // OpenTelemetry
@@ -79,7 +98,8 @@ builder.Services.AddHttpClient("AccountService", client =>
 )
 .AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(
     TimeSpan.FromSeconds(10),
-    Polly.Timeout.TimeoutStrategy.Pessimistic));
+    Polly.Timeout.TimeoutStrategy.Pessimistic))
+.AddHttpMessageHandler<CorrelationIdDelegatingHandler>();
 
 builder.Services.AddScoped<TransactionServiceClient>();
 builder.Services.AddScoped<AccountServiceClient>();
@@ -98,6 +118,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+app.UseSerilogRequestLogging();
 
 app.UseRouting();
 

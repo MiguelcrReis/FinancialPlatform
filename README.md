@@ -86,6 +86,10 @@ docker compose down -v
 | AccountService Swagger | http://localhost:5092/swagger |
 | RabbitMQ Management | http://localhost:15672 |
 | MongoDB | mongodb://localhost:27017 |
+| Elasticsearch | http://localhost:9200 |
+| Kibana | http://localhost:5601 |
+| OTLP gRPC | localhost:4317 |
+| OTLP HTTP | localhost:4318 |
 
 RabbitMQ credentials:
 
@@ -200,6 +204,22 @@ Follow only TransactionService logs:
 docker compose logs -f transaction-service
 ```
 
+## Observability With Kibana
+
+Logs are exported through the OpenTelemetry Collector to Elasticsearch index:
+
+```text
+financialplatform-logs
+```
+
+In Kibana, create a Data View with:
+
+```text
+financialplatform-logs*
+```
+
+Use `@timestamp` as the timestamp field when available. Useful fields include `CorrelationId`, `ServiceName`, `Environment`, `TransactionId`, `RequestPath`, `RoutingKey`, `QueueName`, `RetryCount`, and `DeadLetterReason`.
+
 ## Development Notes
 
 - Use Docker Compose for the full local stack.
@@ -306,6 +326,10 @@ docker compose down -v
 | AccountService Swagger | http://localhost:5092/swagger |
 | RabbitMQ Management | http://localhost:15672 |
 | MongoDB | mongodb://localhost:27017 |
+| Elasticsearch | http://localhost:9200 |
+| Kibana | http://localhost:5601 |
+| OTLP gRPC | localhost:4317 |
+| OTLP HTTP | localhost:4318 |
 
 Credenciais do RabbitMQ:
 
@@ -419,6 +443,22 @@ Acompanhar apenas logs do TransactionService:
 ```powershell
 docker compose logs -f transaction-service
 ```
+
+## Observabilidade Com Kibana
+
+Os logs sao exportados pelo OpenTelemetry Collector para o indice Elasticsearch:
+
+```text
+financialplatform-logs
+```
+
+No Kibana, crie um Data View com:
+
+```text
+financialplatform-logs*
+```
+
+Use `@timestamp` como campo de tempo quando estiver disponivel. Campos uteis incluem `CorrelationId`, `ServiceName`, `Environment`, `TransactionId`, `RequestPath`, `RoutingKey`, `QueueName`, `RetryCount` e `DeadLetterReason`.
 
 ## Notas de Desenvolvimento
 

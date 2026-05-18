@@ -29,6 +29,62 @@ services:
       timeout: 5s
       retries: 5
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.0
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.autoconfiguration.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - elastic-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.4.0
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  elasticsearch-init:
+    image: curlimages/curl:8.11.1
+    container_name: elasticsearch-init
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        curl -fsS -X PUT http://elasticsearch:9200/_index_template/financialplatform-logs-template
+        -H 'Content-Type: application/json'
+        -d '{"index_patterns":["financialplatform-logs*"],"template":{"settings":{"number_of_shards":1,"number_of_replicas":0},"mappings":{"dynamic":true,"properties":{"@timestamp":{"type":"date"},"CorrelationId":{"type":"keyword"},"ServiceName":{"type":"keyword"},"Environment":{"type":"keyword"}}}}}'
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.152.0
+    container_name: otel-collector
+    command: --config=/etc/otelcol-contrib/config.yml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    volumes:
+      - ./otel-collector-config.yml:/etc/otelcol-contrib/config.yml:ro
+    depends_on:
+      elasticsearch-init:
+        condition: service_completed_successfully
+
   account-service:
     build:
       context: .
@@ -39,6 +95,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
+      Observability__OtlpEndpoint: http://otel-collector:4317
 
   transaction-service:
     build:
@@ -65,6 +122,7 @@ services:
       RabbitMq__MaxRetryCount: 3
       RabbitMq__ConnectionRetryCount: 10
       RabbitMq__ConnectionRetryDelaySeconds: 2
+      Observability__OtlpEndpoint: http://otel-collector:4317
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -88,6 +146,7 @@ services:
       RabbitMq__Password: guest
       RabbitMq__ConnectionRetryCount: 10
       RabbitMq__ConnectionRetryDelaySeconds: 2
+      Observability__OtlpEndpoint: http://otel-collector:4317
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -96,3 +155,4 @@ services:
 
 volumes:
   mongo-data:
+  elastic-data:

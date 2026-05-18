@@ -1,5 +1,6 @@
-﻿using ApiGateway.DTOs;
+using ApiGateway.DTOs;
 using ApiGateway.Services;
+using BuildingBlocks.Correlation;
 using BuildingBlocks.Messaging.Contracts;
 using BuildingBlocks.Messaging.Interfaces;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +12,14 @@ namespace ApiGateway.Controllers
     public class TransactionsController : ControllerBase
     {
         private readonly IMessagePublisher _publisher;
+        private readonly ICorrelationContext _correlationContext;
 
-        public TransactionsController(IMessagePublisher publisher)
+        public TransactionsController(
+            IMessagePublisher publisher,
+            ICorrelationContext correlationContext)
         {
             _publisher = publisher;
+            _correlationContext = correlationContext;
         }
 
         [HttpPost]
@@ -37,7 +42,11 @@ namespace ApiGateway.Controllers
                 DateTime.UtcNow
             );
 
-            await _publisher.PublishAsync("transaction.created", @event);
+            var headers = !string.IsNullOrWhiteSpace(_correlationContext.CorrelationId)
+                ? CorrelationIdHeaders.CreateRabbitMqHeaders(_correlationContext.CorrelationId)
+                : null;
+
+            await _publisher.PublishAsync("transaction.created", @event, headers);
 
             return Accepted();
         }

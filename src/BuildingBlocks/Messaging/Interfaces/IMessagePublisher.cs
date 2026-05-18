@@ -6,6 +6,9 @@ namespace BuildingBlocks.Messaging.Interfaces
 {
     public interface IMessagePublisher
     {
-        Task PublishAsync<T>(string routingKey, T message);
+        Task PublishAsync<T>(
+            string routingKey,
+            T message,
+            IReadOnlyDictionary<string, object>? headers = null);
     }
 }

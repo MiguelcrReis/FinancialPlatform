@@ -1,9 +1,12 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using BuildingBlocks.Correlation;
 using BuildingBlocks.Messaging.Contracts;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Serilog.Context;
 using TransactionService.Application.Interfaces;
 using TransactionService.Infrastructure.Settings;
 
@@ -40,72 +43,80 @@ namespace TransactionService.Messaging.Consumers
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.Received += async (_, ea) =>
             {
-                var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-                TransactionCreatedEvent? message;
+                var correlationId = GetOrCreateCorrelationId(ea.BasicProperties);
+                Activity.Current?.SetTag(CorrelationIdConstants.ActivityTagName, correlationId);
 
-                try
+                using (LogContext.PushProperty(CorrelationIdConstants.LogPropertyName, correlationId))
+                using (LogContext.PushProperty("QueueName", _settings.QueueName))
+                using (LogContext.PushProperty("RoutingKey", ea.RoutingKey))
                 {
-                    message = JsonSerializer.Deserialize<TransactionCreatedEvent>(json);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to deserialize transaction message. Sending to DLQ.");
-                    PublishToDeadLetter(ea, "deserialization_failed");
-                    Ack(ea.DeliveryTag);
-                    return;
-                }
+                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+                    TransactionCreatedEvent? message;
 
-                if (message is null)
-                {
-                    _logger.LogWarning("Transaction message deserialized to null. Sending to DLQ.");
-                    PublishToDeadLetter(ea, "message_null");
-                    Ack(ea.DeliveryTag);
-                    return;
-                }
-
-                try
-                {
-                    using var scope = _services.CreateScope();
-                    var processor = scope.ServiceProvider.GetRequiredService<ITransactionProcessorService>();
-
-                    await processor.ProcessAsync(message, stoppingToken);
-
-                    Ack(ea.DeliveryTag);
-                    _logger.LogInformation("Processed transaction message {TransactionId}", message.TransactionId);
-                }
-                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-                {
-                    _logger.LogInformation(
-                        "Transaction consumer is stopping before message {TransactionId} completed.",
-                        message.TransactionId);
-                }
-                catch (Exception ex)
-                {
-                    var nextRetryCount = GetRetryCount(ea.BasicProperties) + 1;
-
-                    if (nextRetryCount <= _settings.MaxRetryCount)
+                    try
                     {
-                        _logger.LogWarning(
-                            ex,
-                            "Processing failed for transaction message {TransactionId}. Retrying attempt {RetryCount}/{MaxRetryCount}.",
-                            message.TransactionId,
-                            nextRetryCount,
-                            _settings.MaxRetryCount);
-
-                        PublishRetry(ea, nextRetryCount);
+                        message = JsonSerializer.Deserialize<TransactionCreatedEvent>(json);
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        _logger.LogError(
-                            ex,
-                            "Processing failed for transaction message {TransactionId} after {MaxRetryCount} retries. Sending to DLQ.",
-                            message.TransactionId,
-                            _settings.MaxRetryCount);
-
-                        PublishToDeadLetter(ea, "max_retries_exceeded");
+                        _logger.LogWarning(ex, "Failed to deserialize transaction message. Sending to DLQ.");
+                        PublishToDeadLetter(ea, "deserialization_failed", correlationId);
+                        Ack(ea.DeliveryTag);
+                        return;
                     }
 
-                    Ack(ea.DeliveryTag);
+                    if (message is null)
+                    {
+                        _logger.LogWarning("Transaction message deserialized to null. Sending to DLQ.");
+                        PublishToDeadLetter(ea, "message_null", correlationId);
+                        Ack(ea.DeliveryTag);
+                        return;
+                    }
+
+                    try
+                    {
+                        using var scope = _services.CreateScope();
+                        var processor = scope.ServiceProvider.GetRequiredService<ITransactionProcessorService>();
+
+                        await processor.ProcessAsync(message, stoppingToken);
+
+                        Ack(ea.DeliveryTag);
+                        _logger.LogInformation("Processed transaction message {TransactionId}", message.TransactionId);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogInformation(
+                            "Transaction consumer is stopping before message {TransactionId} completed.",
+                            message.TransactionId);
+                    }
+                    catch (Exception ex)
+                    {
+                        var nextRetryCount = GetRetryCount(ea.BasicProperties) + 1;
+
+                        if (nextRetryCount <= _settings.MaxRetryCount)
+                        {
+                            _logger.LogWarning(
+                                ex,
+                                "Processing failed for transaction message {TransactionId}. Retrying attempt {RetryCount}/{MaxRetryCount}.",
+                                message.TransactionId,
+                                nextRetryCount,
+                                _settings.MaxRetryCount);
+
+                            PublishRetry(ea, nextRetryCount, correlationId);
+                        }
+                        else
+                        {
+                            _logger.LogError(
+                                ex,
+                                "Processing failed for transaction message {TransactionId} after {MaxRetryCount} retries. Sending to DLQ.",
+                                message.TransactionId,
+                                _settings.MaxRetryCount);
+
+                            PublishToDeadLetter(ea, "max_retries_exceeded", correlationId);
+                        }
+
+                        Ack(ea.DeliveryTag);
+                    }
                 }
             };
 
@@ -135,9 +146,9 @@ namespace TransactionService.Messaging.Consumers
                 _settings.DeadLetterRoutingKey);
         }
 
-        private void PublishRetry(BasicDeliverEventArgs ea, int retryCount)
+        private void PublishRetry(BasicDeliverEventArgs ea, int retryCount, string correlationId)
         {
-            var properties = CreateForwardProperties(ea.BasicProperties);
+            var properties = CreateForwardProperties(ea.BasicProperties, correlationId);
             properties.Headers ??= new Dictionary<string, object>();
             properties.Headers[RetryCountHeader] = retryCount;
 
@@ -148,13 +159,18 @@ namespace TransactionService.Messaging.Consumers
                 ea.Body);
         }
 
-        private void PublishToDeadLetter(BasicDeliverEventArgs ea, string reason)
+        private void PublishToDeadLetter(BasicDeliverEventArgs ea, string reason, string correlationId)
         {
-            var properties = CreateForwardProperties(ea.BasicProperties);
+            var properties = CreateForwardProperties(ea.BasicProperties, correlationId);
             properties.Headers ??= new Dictionary<string, object>();
             properties.Headers[RetryCountHeader] = GetRetryCount(ea.BasicProperties);
             properties.Headers[ErrorReasonHeader] = reason;
             properties.Headers[OriginalRoutingKeyHeader] = ea.RoutingKey;
+
+            _logger.LogWarning(
+                "Publishing RabbitMQ message to dead-letter queue with reason {DeadLetterReason} and original routing key {OriginalRoutingKey}.",
+                reason,
+                ea.RoutingKey);
 
             Publish(
                 _settings.DeadLetterExchangeName,
@@ -163,7 +179,7 @@ namespace TransactionService.Messaging.Consumers
                 ea.Body);
         }
 
-        private IBasicProperties CreateForwardProperties(IBasicProperties? source)
+        private IBasicProperties CreateForwardProperties(IBasicProperties? source, string correlationId)
         {
             IBasicProperties properties;
             lock (_channelLock)
@@ -173,12 +189,13 @@ namespace TransactionService.Messaging.Consumers
 
             properties.Persistent = true;
             properties.ContentType = source?.ContentType ?? "application/json";
-            properties.CorrelationId = source?.CorrelationId;
+            properties.CorrelationId = CorrelationIdHeaders.NormalizeOrNull(source?.CorrelationId) ?? correlationId;
             properties.MessageId = source?.MessageId;
             properties.Type = source?.Type;
             properties.Headers = source?.Headers is null
                 ? new Dictionary<string, object>()
                 : new Dictionary<string, object>(source.Headers);
+            CorrelationIdHeaders.EnsureRabbitMqCorrelationId(properties.Headers, correlationId);
 
             return properties;
         }
@@ -205,6 +222,39 @@ namespace TransactionService.Messaging.Consumers
             {
                 _channel.BasicAck(deliveryTag, multiple: false);
             }
+        }
+
+        private string GetOrCreateCorrelationId(IBasicProperties? properties)
+        {
+            var correlationId = CorrelationIdHeaders.ReadRabbitMqCorrelationId(properties?.Headers);
+            if (correlationId is not null)
+            {
+                return correlationId;
+            }
+
+            correlationId = CorrelationIdHeaders.NormalizeOrNull(properties?.CorrelationId);
+            if (correlationId is not null)
+            {
+                return correlationId;
+            }
+
+            var receivedCorrelationId = properties?.Headers is not null &&
+                properties.Headers.TryGetValue(CorrelationIdConstants.RabbitMqHeaderName, out var headerValue)
+                    ? CorrelationIdHeaders.ConvertHeaderValue(headerValue)
+                    : properties?.CorrelationId;
+
+            correlationId = Guid.NewGuid().ToString("D");
+            _logger.LogWarning(
+                "Missing or invalid correlation id in RabbitMQ message. A new correlation id was generated for this consumption.");
+
+            if (!string.IsNullOrWhiteSpace(receivedCorrelationId))
+            {
+                _logger.LogWarning(
+                    "Invalid correlation id value received in RabbitMQ message metadata: {ReceivedCorrelationId}",
+                    receivedCorrelationId);
+            }
+
+            return correlationId;
         }
 
         private static int GetRetryCount(IBasicProperties? properties)
