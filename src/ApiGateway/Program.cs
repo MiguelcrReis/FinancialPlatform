@@ -45,6 +45,7 @@ builder.Host.UseSerilog();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICorrelationContext, CorrelationContext>();
 builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
 
