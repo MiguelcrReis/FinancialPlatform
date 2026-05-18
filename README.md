@@ -59,6 +59,13 @@ From the repository root:
 docker compose up -d --build
 ```
 
+This starts the full local stack:
+
+```text
+ApiGateway, AccountService, TransactionService, RabbitMQ, MongoDB,
+OpenTelemetry Collector, Elasticsearch, and Kibana.
+```
+
 Check running containers:
 
 ```powershell
@@ -75,6 +82,18 @@ Stop containers and remove persisted MongoDB data:
 
 ```powershell
 docker compose down -v
+```
+
+After startup, Elasticsearch and Kibana may take a few seconds to become ready. Check the stack with:
+
+```powershell
+docker compose ps
+```
+
+To validate Elasticsearch directly:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:9200"
 ```
 
 ## Useful URLs
@@ -220,6 +239,75 @@ financialplatform-logs*
 
 Use `@timestamp` as the timestamp field when available. Useful fields include `CorrelationId`, `ServiceName`, `Environment`, `TransactionId`, `RequestPath`, `RoutingKey`, `QueueName`, `RetryCount`, and `DeadLetterReason`.
 
+### Viewing Logs
+
+Open Kibana:
+
+```text
+http://localhost:5601
+```
+
+Go to:
+
+```text
+Analytics -> Discover
+```
+
+Select the `FinancialPlatform Logs` Data View, set the time range to `Last 24 hours` or `This week`, leave the KQL field empty, and click `Refresh`.
+
+Useful KQL filters:
+
+```kql
+ServiceName : "ApiGateway"
+```
+
+```kql
+ServiceName : "TransactionService"
+```
+
+```kql
+CorrelationId : "33333333-3333-3333-3333-333333333333"
+```
+
+```kql
+SeverityText : "Warning" or SeverityText : "Error"
+```
+
+```kql
+RequestPath : "/api/transactions"
+```
+
+### Importing Dashboards
+
+The exported Kibana dashboard is versioned at:
+
+```text
+observability/kibana/financialplatform-dashboard.ndjson
+```
+
+To import it:
+
+1. Open Kibana at `http://localhost:5601`.
+2. Go to `Stack Management -> Saved Objects`.
+3. Click `Import`.
+4. Select `observability/kibana/financialplatform-dashboard.ndjson`.
+5. Keep related objects enabled and confirm the import.
+
+The `.ndjson` file contains only Kibana saved objects such as dashboards, visualizations, and the Data View. It does not contain logs or application data.
+
+### Dashboard Panels
+
+The recommended dashboard panels are:
+
+| Panel | Purpose |
+| --- | --- |
+| Logs by service | Shows which services are generating logs in the selected period. |
+| Logs by level | Groups logs by severity, such as Information, Warning, and Error. |
+| Logs over time | Shows log volume trends and activity spikes. |
+| Requests by route | Shows which HTTP routes are receiving traffic. |
+| Warnings and errors | Focuses investigation on warning and error events. |
+| Average response time by route | Shows average HTTP response time per route using the `Elapsed` field. |
+
 ## Development Notes
 
 - Use Docker Compose for the full local stack.
@@ -299,6 +387,13 @@ Na raiz do repositorio:
 docker compose up -d --build
 ```
 
+Isso sobe a stack local completa:
+
+```text
+ApiGateway, AccountService, TransactionService, RabbitMQ, MongoDB,
+OpenTelemetry Collector, Elasticsearch e Kibana.
+```
+
 Verificar containers em execucao:
 
 ```powershell
@@ -315,6 +410,18 @@ Parar os containers e remover os dados persistidos do MongoDB:
 
 ```powershell
 docker compose down -v
+```
+
+Depois de subir, Elasticsearch e Kibana podem levar alguns segundos para ficarem prontos. Verifique a stack com:
+
+```powershell
+docker compose ps
+```
+
+Para validar o Elasticsearch diretamente:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:9200"
 ```
 
 ## URLs Uteis
@@ -459,6 +566,75 @@ financialplatform-logs*
 ```
 
 Use `@timestamp` como campo de tempo quando estiver disponivel. Campos uteis incluem `CorrelationId`, `ServiceName`, `Environment`, `TransactionId`, `RequestPath`, `RoutingKey`, `QueueName`, `RetryCount` e `DeadLetterReason`.
+
+### Visualizando Logs
+
+Abra o Kibana:
+
+```text
+http://localhost:5601
+```
+
+Va para:
+
+```text
+Analytics -> Discover
+```
+
+Selecione o Data View `FinancialPlatform Logs`, ajuste o intervalo para `Last 24 hours` ou `This week`, deixe o campo KQL vazio e clique em `Refresh`.
+
+Filtros KQL uteis:
+
+```kql
+ServiceName : "ApiGateway"
+```
+
+```kql
+ServiceName : "TransactionService"
+```
+
+```kql
+CorrelationId : "33333333-3333-3333-3333-333333333333"
+```
+
+```kql
+SeverityText : "Warning" or SeverityText : "Error"
+```
+
+```kql
+RequestPath : "/api/transactions"
+```
+
+### Importando Dashboards
+
+O dashboard exportado do Kibana esta versionado em:
+
+```text
+observability/kibana/financialplatform-dashboard.ndjson
+```
+
+Para importar:
+
+1. Abra o Kibana em `http://localhost:5601`.
+2. Va para `Stack Management -> Saved Objects`.
+3. Clique em `Import`.
+4. Selecione `observability/kibana/financialplatform-dashboard.ndjson`.
+5. Mantenha os objetos relacionados habilitados e confirme a importacao.
+
+O arquivo `.ndjson` contem apenas objetos salvos do Kibana, como dashboards, visualizacoes e Data View. Ele nao contem logs nem dados da aplicacao.
+
+### Paineis Do Dashboard
+
+Os paineis recomendados do dashboard sao:
+
+| Painel | Objetivo |
+| --- | --- |
+| Logs por servico | Mostra quais servicos estao gerando logs no periodo selecionado. |
+| Logs por nivel | Agrupa logs por severidade, como Information, Warning e Error. |
+| Logs ao longo do tempo | Mostra tendencia de volume de logs e picos de atividade. |
+| Requests por rota | Mostra quais rotas HTTP estao recebendo trafego. |
+| Warnings e erros | Foca a investigacao em eventos de warning e erro. |
+| Tempo medio de resposta por rota | Mostra o tempo medio de resposta HTTP por rota usando o campo `Elapsed`. |
 
 ## Notas de Desenvolvimento
 
